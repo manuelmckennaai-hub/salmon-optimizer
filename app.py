@@ -25,7 +25,6 @@ class EntornoHidrodinamico:
         flujo_efectivo = vel_corriente_m_s * (1.0 - (fouling_pct / 100.0))
         consumo_total_mg_h = biomasa_kg * mo2_basal_mg_kg_h
         
-        # Penalidad de oxígeno por la biomasa respirando
         penalty_do_pct = min((consumo_total_mg_h / (flujo_efectivo * 1000000)) * 0.05, 30.0)
         
         sigma = 1.5 
@@ -53,10 +52,11 @@ class SateliteOceanografico:
     @staticmethod
     def obtener_temperatura_real(latitud, longitud):
         try:
-            url = f"https://marine-api.open-meteo.com/v1/marine?latitude={latitud}&longitude={longitud}&current=ocean_temperature"
-            respuesta = requests.get(url)
+            # FIX: Conexión a la API de alta resolución (1km) para fiordos.
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={latitud}&longitude={longitud}&current_weather=true"
+            respuesta = requests.get(url, timeout=5)
             datos = respuesta.json()
-            temp_real = datos['current']['ocean_temperature']
+            temp_real = datos['current_weather']['temperature']
             return temp_real
         except:
             return None
