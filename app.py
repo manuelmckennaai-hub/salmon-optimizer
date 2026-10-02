@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import requests
 from scipy.interpolate import PchipInterpolator
 
 st.set_page_config(page_title="SalmonFeed SaaS", layout="wide")
@@ -32,6 +33,18 @@ class SDA_Nutricional:
         costo_dieta = (pct_prot * 0.25) + (pct_lip * 0.04) + (pct_carb * 0.12)
         costo_estandar = (45 * 0.25) + (28 * 0.04) + (12 * 0.12)
         return 1.0 + (0.4 * (costo_dieta / costo_estandar))
+        class SateliteOceanografico:
+    @staticmethod
+    def obtener_temperatura_real(latitud, longitud):
+        try:
+            # Conexión a la API oceanográfica en tiempo real
+            url = f"https://marine-api.open-meteo.com/v1/marine?latitude={latitud}&longitude={longitud}&current=ocean_temperature"
+            respuesta = requests.get(url)
+            datos = respuesta.json()
+            temp_real = datos['current']['ocean_temperature']
+            return temp_real
+        except:
+            return None # Si falla el internet, devuelve None
 
 # --- INTERFAZ SIDEBAR ---
 st.sidebar.header("1. Parámetros Operativos")
@@ -45,11 +58,35 @@ pct_prot = st.sidebar.slider("% Proteína Cruda", 30.0, 60.0, 46.5)
 pct_lip = st.sidebar.slider("% Lípidos", 15.0, 40.0, 28.0)
 pct_carb = st.sidebar.slider("% Carbohidratos", 5.0, 25.0, 12.0)
 
-st.sidebar.header("3. Telemetría de Sensores")
-t_sup = st.sidebar.number_input("Temp Superficie (°C)", value=14.5)
+st.sidebar.header("3. Telemetría y APIs")
+usar_api = st.sidebar.checkbox("📡 Conectar a Océano Real (API)")
+
+if usar_api:
+    ubicacion = st.sidebar.selectbox("Seleccionar Centro de Cultivo", ["Matre, Noruega", "Puerto Montt, Chile"])
+    
+    # Coordenadas exactas
+    if ubicacion == "Matre, Noruega":
+        lat, lon = 60.87, 5.58
+    else:
+        lat, lon = -41.47, -72.93
+        
+    temp_satelite = SateliteOceanografico.obtener_temperatura_real(lat, lon)
+    
+    if temp_satelite:
+        st.sidebar.success(f"Conectado. Temp del mar en {ubicacion}: {temp_satelite}°C")
+        t_sup = temp_satelite
+        t_fon = temp_satelite - 3.5 # Estimación de termoclina a 15m
+    else:
+        st.sidebar.error("Error conectando a la API satelital.")
+        t_sup = 14.5
+        t_fon = 10.0
+else:
+    st.sidebar.info("Modo Manual Activo")
+    t_sup = st.sidebar.number_input("Temp Superficie (°C)", value=14.5)
+    t_fon = st.sidebar.number_input("Temp Fondo 15m (°C)", value=10.0)
+
 do_sup = st.sidebar.number_input("DO Superficie (%)", value=85.0)
-t_fon = st.sidebar.number_input("Temp Fondo (15m) (°C)", value=10.0)
-do_fon = st.sidebar.number_input("DO Fondo (15m) (%)", value=60.0)
+do_fon = st.sidebar.number_input("DO Fondo 15m (%)", value=60.0)
 
 # --- EJECUCIÓN ---
 z_array, temp_array, do_array = SparseEnvironmentInterpolator.generar_perfil_completo(t_sup, do_sup, t_fon, do_fon)
